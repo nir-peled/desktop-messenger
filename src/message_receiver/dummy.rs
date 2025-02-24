@@ -5,9 +5,9 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
-use super::{MessageReceiver, OpenConnection};
+use super::{MessageReceiver, OpenConnection, OpenConnectionHolder};
 use crate::message::Message;
-use crate::task_queue::{Task, TaskQueue};
+use crate::task_queue::{TaskData, TaskQueue};
 
 pub struct DummyOpenConnection {
 	task_queue: TaskQueue,
@@ -18,8 +18,7 @@ pub struct DummyOpenConnection {
 pub struct DummyMessageReceiver {}
 
 impl DummyOpenConnection {
-	pub async fn new(task_queue: TaskQueue) -> Arc<Mutex<Self>> {
-		println!("creating DummyOpenConnection");
+	pub async fn new(task_queue: TaskQueue) -> OpenConnectionHolder {
 		let result = Arc::new(Mutex::new(Self {
 			task_queue: task_queue,
 			loop_handle: tokio::task::spawn(async {}),
@@ -51,7 +50,6 @@ impl DummyOpenConnection {
 
 impl Drop for DummyOpenConnection {
 	fn drop(&mut self) {
-		println!("dropping DummyOpenConnection");
 		self.loop_handle.abort();
 	}
 }
@@ -62,12 +60,18 @@ impl OpenConnection for DummyOpenConnection {
 		self.channels.push(channel.to_string());
 	}
 
+	fn remove_channel(&mut self, channel: &str) {
+		self.channels.retain(|c| c != channel);
+	}
+
 	fn channels(&self) -> Vec<String> {
 		self.channels.clone()
 	}
 
 	async fn send_message(&mut self, message: Message) {
-		self.task_queue.push(Task::receive_message(message)).await
+		self.task_queue
+			.push(TaskData::ReceiveMessage(message))
+			.await
 	}
 }
 
@@ -78,7 +82,7 @@ impl DummyMessageReceiver {
 }
 
 impl MessageReceiver for DummyMessageReceiver {
-	async fn listen(&mut self, task_queue: TaskQueue) -> Arc<Mutex<dyn OpenConnection>> {
+	async fn listen(&mut self, task_queue: TaskQueue) -> OpenConnectionHolder {
 		DummyOpenConnection::new(task_queue).await
 	}
 }

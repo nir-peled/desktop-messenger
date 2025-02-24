@@ -1,6 +1,6 @@
-use crate::message_receiver::MessageReceiver;
+use crate::message_receiver::{MessageReceiver, OpenConnectionHolder};
 use crate::message_sender::MessageSender;
-use crate::task_queue::TaskQueue;
+use crate::task_queue::{TaskData, TaskQueue};
 use crate::ui_connector::UIConnector;
 
 pub struct Messenger<TReceiver: MessageReceiver, TSender: MessageSender, TUI: UIConnector> {
@@ -30,25 +30,25 @@ impl<TReceiver: MessageReceiver, TSender: MessageSender, TUI: UIConnector>
 
 		self.ui_connector.start(self.task_queue.clone());
 
-		self.handle_tasks().await;
+		self.handle_tasks(&connection).await;
 
 		println!("Shutting down server...");
 	}
 
-	async fn handle_tasks(&mut self) {
+	async fn handle_tasks(&mut self, connection: &OpenConnectionHolder) {
 		let mut task = self.task_queue.pop().await;
-		while task.kind != "exit" {
-			match task.kind.as_str() {
-				"send" => {
-					self.message_sender.send_text_message(task.message.unwrap());
+		loop {
+			match task {
+				TaskData::SendMessage(message) => self.message_sender.send_text_message(message),
+				TaskData::ReceiveMessage(message) => self.ui_connector.message_received(message),
+				TaskData::NewChannel(channel) => {
+					connection.lock().await.add_channel(channel.as_str())
 				}
-				"receive" => {
-					self.ui_connector.message_received(task.message.unwrap());
+				TaskData::RemoveChannel(channel) => {
+					connection.lock().await.remove_channel(channel.as_str())
 				}
-				_ => {
-					panic!("unknown task kind: {}", task.kind)
-				}
-			}
+				TaskData::Exit => break,
+			};
 
 			task = self.task_queue.pop().await;
 		}
