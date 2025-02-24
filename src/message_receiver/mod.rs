@@ -13,6 +13,7 @@ pub trait OpenConnection {
 }
 
 pub trait MessageReceiver {
+	#[must_use]
 	async fn listen(&mut self, task_queue: TaskQueue) -> Arc<Mutex<dyn OpenConnection>>;
 }
 
