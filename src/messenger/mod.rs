@@ -26,7 +26,6 @@ impl<TReceiver: MessageReceiver, TSender: MessageSender, TUI: UIConnector>
 		println!("Starting Server");
 
 		let connection = self.message_receiver.listen(self.task_queue.clone()).await;
-		connection.lock().await.add_channel("/default"); // debug
 
 		self.ui_connector.start(self.task_queue.clone());
 
