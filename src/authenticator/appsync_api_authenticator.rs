@@ -6,6 +6,12 @@ pub struct AppSyncAPIAuthenticator {
 	api_key: String,
 }
 
+impl AppSyncAPIAuthenticator {
+	pub fn new(hostname: String, api_key: String) -> Self {
+		Self { hostname, api_key }
+	}
+}
+
 impl Authenticator for AppSyncAPIAuthenticator {
 	fn authenticate(&mut self) -> bool {
 		return true;

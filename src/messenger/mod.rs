@@ -38,7 +38,9 @@ impl<TReceiver: MessageReceiver, TSender: MessageSender, TUI: UIConnector>
 		let mut task = self.task_queue.pop().await;
 		loop {
 			match task {
-				TaskData::SendMessage(message) => self.message_sender.send_text_message(message),
+				TaskData::SendMessage(message) => {
+					self.message_sender.send_text_message(message).await
+				}
 				TaskData::ReceiveMessage(message) => self.ui_connector.message_received(message),
 				TaskData::NewChannel(channel) => {
 					connection.lock().await.add_channel(channel.as_str())
