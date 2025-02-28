@@ -93,7 +93,8 @@ macro_rules! Settings {
 				let lines = Self::read_lines(filename)?;
 
 				for line in lines {
-					let (field_name, field_value) = Self::line_parts(line, &read_mode)?;
+					let line_value = line?;
+					let (field_name, field_value) = Self::line_parts(&line_value, &read_mode)?;
 					let mut found = false; // to avoid checking fields after found
 					$(
 						if !found && stringify!($field) == field_name {
@@ -123,20 +124,19 @@ macro_rules! Settings {
 					Ok(io::BufReader::new(file).lines())
 			}
 
-			fn line_parts(line: Result<String, std::io::Error>, mode: &SettingsFileReadMode) -> Result<(String, String), SettingsReadError> {
+			fn line_parts<'a>(line: &'a str, mode: &SettingsFileReadMode) -> Result<(&'a str, &'a str), SettingsReadError> {
 				match (mode) {
 					SettingsFileReadMode::ENV => Self::env_line_split(line),
 				}
 			}
 
-			fn env_line_split(line: Result<String, std::io::Error>) -> Result<(String, String), SettingsReadError> {
-				let line_value = line?;
-				let mut splitter = line_value.splitn(2, "=");
+			fn env_line_split<'a>(line: &'a str) -> Result<(&'a str, &'a str), SettingsReadError> {
+				let mut splitter = line.splitn(2, "=");
 				let error_maker = || SettingsReadError::BadFile("bad line formatting".to_string());
 				let field_name = splitter.next().ok_or_else(error_maker)?;
 				let field_value = splitter.next().ok_or_else(error_maker)?;
 
-				Ok((field_name.to_string(), field_value.to_string()))
+				Ok((field_name, field_value))
 			}
 		}
 	};
