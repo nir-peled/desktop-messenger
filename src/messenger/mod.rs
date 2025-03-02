@@ -1,5 +1,5 @@
 use crate::message_receiver::{MessageReceiver, OpenConnectionHolder};
-use crate::message_sender::MessageSender;
+use crate::message_sender::{MessageSendError, MessageSender};
 use crate::task_queue::{TaskData, TaskQueue};
 use crate::ui_connector::UIConnector;
 
@@ -39,14 +39,17 @@ impl<TReceiver: MessageReceiver, TSender: MessageSender, TUI: UIConnector>
 		loop {
 			match task {
 				TaskData::SendMessage(message) => {
-					self.message_sender.send_text_message(message).await
+					let res = self.message_sender.send_text_message(message).await;
+					if let Err(e) = res {
+						println!("Error sending message: {}", e);
+					}
 				}
 				TaskData::ReceiveMessage(message) => self.ui_connector.message_received(message),
 				TaskData::NewChannel(channel) => {
-					connection.lock().await.add_channel(channel.as_str())
+					connection.lock().await.add_channel(channel.as_str());
 				}
 				TaskData::RemoveChannel(channel) => {
-					connection.lock().await.remove_channel(channel.as_str())
+					connection.lock().await.remove_channel(channel.as_str());
 				}
 				TaskData::Exit => break,
 			};

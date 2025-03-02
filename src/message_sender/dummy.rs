@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use super::MessageSender;
+use super::{MessageSendError, MessageSender};
 use crate::message::Message;
 
 pub struct DummyMessageSender {}
@@ -13,7 +13,8 @@ impl DummyMessageSender {
 
 #[async_trait]
 impl MessageSender for DummyMessageSender {
-	async fn send_text_message(&mut self, message: Message) {
+	async fn send_text_message(&mut self, message: Message) -> Result<(), MessageSendError> {
 		println!("Sending message: {:?}", message);
+		Ok(())
 	}
 }
