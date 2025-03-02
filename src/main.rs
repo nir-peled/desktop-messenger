@@ -19,18 +19,17 @@ use crate::ui_connector::simplified::SimplifiedUI;
 async fn main() {
 	let settings = Settings::from_env_file(".env.local");
 	match settings {
-		Ok(settings) => {
-			let auth = AppSyncAPIAuthenticator::new(
-				settings.APPSYNC_HTTP_DOMAIN,
-				settings.APPSYNC_API_KEY,
-			);
-			let mut messenger = Messenger::new(
-				DummyMessageReceiver::new(),
-				DummyMessageSender::new(),
-				SimplifiedUI::new(),
-			);
-			messenger.start().await;
-		}
+		Ok(settings) => run_client(settings).await,
 		Err(err) => println!("error reading settings: {}", err),
 	}
+}
+
+async fn run_client(settings: Settings) {
+	let auth = AppSyncAPIAuthenticator::new(settings.APPSYNC_HTTP_DOMAIN, settings.APPSYNC_API_KEY);
+	let mut messenger = Messenger::new(
+		DummyMessageReceiver::new(),
+		DummyMessageSender::new(),
+		SimplifiedUI::new(),
+	);
+	messenger.start().await;
 }

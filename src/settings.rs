@@ -13,11 +13,9 @@ use std::path::Path;
 pub enum SettingsReadError {
 	MissingField(String),
 	DuplicateField(String),
+	UnknownField(String),
 	BadFile(String),
-}
-
-pub enum SettingsFileReadMode {
-	ENV,
+	BadFormatting(String),
 }
 
 impl std::error::Error for SettingsReadError {}
@@ -27,7 +25,9 @@ impl fmt::Display for SettingsReadError {
 		match self {
 			Self::MissingField(name) => write!(f, "Field missing from env file: {}", name),
 			Self::DuplicateField(name) => write!(f, "Duplicate field in env file: {}", name),
-			Self::BadFile(e) => write!(f, "Could not read file: {}", e),
+			Self::UnknownField(name) => write!(f, "Unknown field provided: {}", name),
+			Self::BadFile(e) => write!(f, "Error in reading file: {}", e),
+			Self::BadFormatting(e) => write!(f, "Error in parsing file: {}", e),
 		}
 	}
 }
@@ -40,25 +40,25 @@ impl From<std::io::Error> for SettingsReadError {
 
 impl From<core::num::ParseIntError> for SettingsReadError {
 	fn from(error: core::num::ParseIntError) -> Self {
-		Self::BadFile(error.to_string())
+		Self::BadFormatting(error.to_string())
 	}
 }
 
 impl From<core::num::ParseFloatError> for SettingsReadError {
 	fn from(error: core::num::ParseFloatError) -> Self {
-		Self::BadFile(error.to_string())
+		Self::BadFormatting(error.to_string())
 	}
 }
 
 impl From<core::str::ParseBoolError> for SettingsReadError {
 	fn from(error: core::str::ParseBoolError) -> Self {
-		Self::BadFile(error.to_string())
+		Self::BadFormatting(error.to_string())
 	}
 }
 
 impl From<std::convert::Infallible> for SettingsReadError {
 	fn from(error: std::convert::Infallible) -> Self {
-		Self::BadFile(error.to_string())
+		Self::BadFormatting(error.to_string())
 	}
 }
 
@@ -84,18 +84,13 @@ macro_rules! Settings {
 		impl Settings {
 			pub fn from_env_file<P>(filename: P) -> Result<Self, SettingsReadError>
 			where P: AsRef<Path>, {
-				Self::from_file(filename, SettingsFileReadMode::ENV)
-			}
-
-			pub fn from_file<P>(filename: P, read_mode: SettingsFileReadMode) -> Result<Self, SettingsReadError>
-			where P: AsRef<Path>, {
 				let mut read_value = SettingsReadValues::empty();
 				let lines = Self::read_lines(filename)?;
 
 				for line in lines {
 					let line_value = line?;
-					let (field_name, field_value) = Self::line_parts(&line_value, &read_mode)?;
-					let mut found = false; // to avoid checking fields after found
+					let (field_name, field_value) = Self::line_parts(&line_value)?;
+					let mut found = false;
 					$(
 						if !found && stringify!($field) == field_name {
 							found = true;
@@ -105,6 +100,9 @@ macro_rules! Settings {
 							}
 						}
 					)*
+					if !found {
+						return Err(SettingsReadError::UnknownField(field_name.to_string()));
+					}
 				}
 
 				Ok(
@@ -124,15 +122,10 @@ macro_rules! Settings {
 					Ok(io::BufReader::new(file).lines())
 			}
 
-			fn line_parts<'a>(line: &'a str, mode: &SettingsFileReadMode) -> Result<(&'a str, &'a str), SettingsReadError> {
-				match (mode) {
-					SettingsFileReadMode::ENV => Self::env_line_split(line),
-				}
-			}
-
-			fn env_line_split<'a>(line: &'a str) -> Result<(&'a str, &'a str), SettingsReadError> {
+			fn line_parts(line: &str) -> Result<(&str, &str), SettingsReadError> {
 				let mut splitter = line.splitn(2, "=");
-				let error_maker = || SettingsReadError::BadFile("bad line formatting".to_string());
+				let error_maker =
+					|| SettingsReadError::BadFormatting(format!("bad line formatting: \"{}\"", line).to_string());
 				let field_name = splitter.next().ok_or_else(error_maker)?;
 				let field_value = splitter.next().ok_or_else(error_maker)?;
 
