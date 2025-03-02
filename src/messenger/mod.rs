@@ -69,10 +69,10 @@ impl<
 				}
 				TaskData::ReceiveMessage(message) => self.ui_connector.message_received(message),
 				TaskData::NewChannel(channel) => {
-					connection.lock().await.add_channel(channel.as_str());
+					connection.lock().await.add_channel(&channel);
 				}
 				TaskData::RemoveChannel(channel) => {
-					connection.lock().await.remove_channel(channel.as_str());
+					connection.lock().await.remove_channel(&channel);
 				}
 				TaskData::Exit => break,
 			};

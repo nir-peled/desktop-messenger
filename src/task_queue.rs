@@ -12,8 +12,8 @@ use crate::message::Message;
 pub enum TaskData {
 	SendMessage(Message),
 	ReceiveMessage(Message),
-	NewChannel(String),
-	RemoveChannel(String),
+	NewChannel(Box<str>),
+	RemoveChannel(Box<str>),
 	Exit,
 }
 

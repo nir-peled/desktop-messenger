@@ -20,9 +20,9 @@ impl SimplifiedUI {
 	async fn handle_command(task_queue: &mut TaskQueue, line: String) -> UIStatus {
 		let mut splitter = line.splitn(4, " ");
 		let command = splitter.next().unwrap_or("");
-		let arg1 = splitter.next().unwrap_or("").to_string();
-		let arg2 = splitter.next().unwrap_or("").to_string();
-		let arg3 = splitter.next().unwrap_or("").to_string();
+		let arg1 = splitter.next().unwrap_or("").into();
+		let arg2 = splitter.next().unwrap_or("").into();
+		let arg3 = splitter.next().unwrap_or("").into();
 
 		match command {
 			"" => (),

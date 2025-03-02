@@ -1,6 +1,6 @@
 #[derive(Debug, Clone)]
 pub struct Message {
-	pub sender: String,
-	pub channel: String,
-	pub contents: String,
+	pub sender: Box<str>,
+	pub channel: Box<str>,
+	pub contents: Box<str>,
 }
