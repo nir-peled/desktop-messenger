@@ -12,7 +12,7 @@ pub enum MessageSendError {
 
 #[async_trait]
 pub trait MessageSender {
-	async fn send_text_message(&mut self, message: Message) -> Result<(), MessageSendError>;
+	async fn send_text_message(&self, message: Message) -> Result<(), MessageSendError>;
 }
 
 impl std::error::Error for MessageSendError {}

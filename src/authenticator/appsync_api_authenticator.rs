@@ -13,7 +13,7 @@ impl AppSyncAPIAuthenticator {
 }
 
 impl Authenticator for AppSyncAPIAuthenticator {
-	fn authenticate(&mut self) -> bool {
+	fn authenticate(&self) -> bool {
 		return true;
 	}
 

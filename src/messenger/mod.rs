@@ -1,20 +1,39 @@
+use std::sync::Arc;
+
+use crate::authenticator::Authenticator;
 use crate::message_receiver::{MessageReceiver, OpenConnectionHolder};
-use crate::message_sender::{MessageSendError, MessageSender};
+use crate::message_sender::MessageSender;
 use crate::task_queue::{TaskData, TaskQueue};
 use crate::ui_connector::UIConnector;
 
-pub struct Messenger<TReceiver: MessageReceiver, TSender: MessageSender, TUI: UIConnector> {
+pub struct Messenger<
+	TAuth: Authenticator,
+	TReceiver: MessageReceiver,
+	TSender: MessageSender,
+	TUI: UIConnector,
+> {
+	authenticator: Arc<TAuth>,
 	message_receiver: TReceiver,
 	message_sender: TSender,
 	ui_connector: TUI,
 	task_queue: TaskQueue,
 }
 
-impl<TReceiver: MessageReceiver, TSender: MessageSender, TUI: UIConnector>
-	Messenger<TReceiver, TSender, TUI>
+impl<
+		TAuth: Authenticator,
+		TReceiver: MessageReceiver,
+		TSender: MessageSender,
+		TUI: UIConnector,
+	> Messenger<TAuth, TReceiver, TSender, TUI>
 {
-	pub fn new(message_receiver: TReceiver, message_sender: TSender, ui_connector: TUI) -> Self {
+	pub fn new(
+		authenticator: Arc<TAuth>,
+		message_receiver: TReceiver,
+		message_sender: TSender,
+		ui_connector: TUI,
+	) -> Self {
 		return Messenger {
+			authenticator,
 			message_receiver,
 			message_sender,
 			ui_connector,
@@ -24,6 +43,10 @@ impl<TReceiver: MessageReceiver, TSender: MessageSender, TUI: UIConnector>
 
 	pub async fn start(&mut self) {
 		println!("Starting Server");
+		if !self.authenticator.authenticate() {
+			println!("Authentication Failed!");
+			return;
+		}
 
 		let connection = self.message_receiver.listen(self.task_queue.clone()).await;
 

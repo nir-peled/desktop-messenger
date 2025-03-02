@@ -46,22 +46,33 @@ impl AppSyncMessageSender {
 		let body_bytes = hyper::body::to_bytes(response.into_body()).await?;
 		Ok(String::from_utf8(body_bytes.to_vec())?)
 	}
-}
 
-#[async_trait]
-impl MessageSender for AppSyncMessageSender {
-	async fn send_text_message(&mut self, message: Message) -> Result<(), MessageSendError> {
+	fn build_message(
+		&self,
+		message: Message,
+	) -> Result<hyper::http::request::Request<hyper::body::Body>, MessageSendError> {
 		let body = Self::message_to_body(message);
+
 		let mut request_builder = hyper::Request::builder()
 			.method(hyper::Method::POST)
 			.uri(self.uri.clone())
 			.header("content_type", "application/json");
+
 		for (key, value) in self.auth.publish_auth_headers() {
 			request_builder = request_builder.header(key, value);
 		}
-		let request = request_builder.body(body)?;
+
+		Ok(request_builder.body(body)?)
+	}
+}
+
+#[async_trait]
+impl MessageSender for AppSyncMessageSender {
+	async fn send_text_message(&self, message: Message) -> Result<(), MessageSendError> {
+		let request = self.build_message(message)?;
 
 		let response = self.client.request(request).await?;
+
 		if !response.status().is_success() {
 			return Err(MessageSendError::SendFailed(
 				Self::response_body(response).await?,

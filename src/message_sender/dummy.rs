@@ -13,7 +13,7 @@ impl DummyMessageSender {
 
 #[async_trait]
 impl MessageSender for DummyMessageSender {
-	async fn send_text_message(&mut self, message: Message) -> Result<(), MessageSendError> {
+	async fn send_text_message(&self, message: Message) -> Result<(), MessageSendError> {
 		println!("Sending message: {:?}", message);
 		Ok(())
 	}
