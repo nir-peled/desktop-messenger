@@ -30,10 +30,6 @@ impl AppSyncMessageSender {
 		})
 	}
 
-	async fn response_body(response: Response) -> Result<String, MessageSendError> {
-		Ok(response.text().await?)
-	}
-
 	fn build_message(&self, message: Message) -> RequestBuilder {
 		let body = Self::message_to_body(message);
 
@@ -58,9 +54,7 @@ impl MessageSender for AppSyncMessageSender {
 		let response = request.send().await?;
 
 		if !response.status().is_success() {
-			return Err(MessageSendError::SendFailed(
-				Self::response_body(response).await?,
-			));
+			return Err(MessageSendError::SendFailed(response.text().await?));
 		}
 
 		Ok(())
@@ -69,12 +63,6 @@ impl MessageSender for AppSyncMessageSender {
 
 impl From<reqwest::Error> for MessageSendError {
 	fn from(error: reqwest::Error) -> Self {
-		Self::HTTPError(error.to_string())
-	}
-}
-
-impl From<std::string::FromUtf8Error> for MessageSendError {
-	fn from(error: std::string::FromUtf8Error) -> Self {
 		Self::HTTPError(error.to_string())
 	}
 }
