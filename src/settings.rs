@@ -65,10 +65,12 @@ impl From<std::convert::Infallible> for SettingsReadError {
 macro_rules! Settings {
 	($($field:ident : $t:ty),* $(,)? ) => {
 		#[derive(Debug)]
+		#[allow(non_snake_case)]
 		pub struct Settings {
 			$(pub $field: $t),*
 		}
 
+		#[allow(non_snake_case)]
 		struct SettingsReadValues {
 			$(pub $field: Option<$t>),*
 		}

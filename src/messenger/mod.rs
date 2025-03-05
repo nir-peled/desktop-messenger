@@ -48,13 +48,17 @@ impl<
 			return;
 		}
 
-		let connection = self.message_receiver.listen(self.task_queue.clone()).await;
+		let connect_result = self.message_receiver.listen(self.task_queue.clone()).await;
+		match connect_result {
+			Ok(connection) => {
+				self.ui_connector.start(self.task_queue.clone());
 
-		self.ui_connector.start(self.task_queue.clone());
+				self.handle_tasks(&connection).await;
 
-		self.handle_tasks(&connection).await;
-
-		println!("Shutting down server...");
+				println!("Shutting down server...");
+			}
+			Err(e) => println!("Could not connect: {}", e),
+		}
 	}
 
 	async fn handle_tasks(&mut self, connection: &OpenConnectionHolder) {
@@ -69,10 +73,10 @@ impl<
 				}
 				TaskData::ReceiveMessage(message) => self.ui_connector.message_received(message),
 				TaskData::NewChannel(channel) => {
-					connection.lock().await.add_channel(&channel);
+					connection.lock().await.add_channel(&channel).await;
 				}
 				TaskData::RemoveChannel(channel) => {
-					connection.lock().await.remove_channel(&channel);
+					connection.lock().await.remove_channel(&channel).await;
 				}
 				TaskData::Exit => break,
 			};

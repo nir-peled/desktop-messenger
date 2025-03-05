@@ -5,14 +5,14 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
-use super::{MessageReceiver, OpenConnection, OpenConnectionHolder};
+use super::{MessageReceiver, MessageReceiverError, OpenConnection, OpenConnectionHolder};
 use crate::message::Message;
 use crate::task_queue::{TaskData, TaskQueue};
 
 pub struct DummyOpenConnection {
 	task_queue: TaskQueue,
 	loop_handle: JoinHandle<()>,
-	channels: Vec<String>,
+	channels: Vec<Box<str>>,
 }
 
 pub struct DummyMessageReceiver {}
@@ -30,15 +30,21 @@ impl DummyOpenConnection {
 			let duration = Duration::from_secs(3);
 			let mut interval = tokio::time::interval(duration);
 			let message = Message {
-				sender: "dummy".to_string(),
-				channel: "dummy".to_string(),
-				contents: "Hello, Dummy!".to_string(),
+				sender: "dummy".into(),
+				channel: "dummy".into(),
+				contents: "Hello, Dummy!".into(),
 			};
 
 			loop {
 				interval.tick().await;
 				match weak_copy.upgrade() {
-					Some(connection) => connection.lock().await.send_message(message.clone()).await,
+					Some(connection) => {
+						connection
+							.lock()
+							.await
+							.receive_message(message.clone())
+							.await
+					}
 					None => return,
 				};
 			}
@@ -56,19 +62,19 @@ impl Drop for DummyOpenConnection {
 
 #[async_trait]
 impl OpenConnection for DummyOpenConnection {
-	fn add_channel(&mut self, channel: &str) {
-		self.channels.push(channel.to_string());
+	async fn add_channel(&mut self, channel: &str) {
+		self.channels.push(channel.into());
 	}
 
-	fn remove_channel(&mut self, channel: &str) {
-		self.channels.retain(|c| c != channel);
+	async fn remove_channel(&mut self, channel: &str) {
+		self.channels.retain(|c| **c != *channel);
 	}
 
-	fn channels(&self) -> Vec<String> {
+	fn channels(&self) -> Vec<Box<str>> {
 		self.channels.clone()
 	}
 
-	async fn send_message(&mut self, message: Message) {
+	async fn receive_message(&mut self, message: Message) {
 		self.task_queue
 			.push(TaskData::ReceiveMessage(message))
 			.await
@@ -82,7 +88,10 @@ impl DummyMessageReceiver {
 }
 
 impl MessageReceiver for DummyMessageReceiver {
-	async fn listen(&mut self, task_queue: TaskQueue) -> OpenConnectionHolder {
-		DummyOpenConnection::new(task_queue).await
+	async fn listen(
+		&self,
+		task_queue: TaskQueue,
+	) -> Result<OpenConnectionHolder, MessageReceiverError> {
+		Ok(DummyOpenConnection::new(task_queue).await)
 	}
 }

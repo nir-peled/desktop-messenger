@@ -6,9 +6,9 @@ use async_trait::async_trait;
 use super::{MessageSendError, MessageSender};
 use crate::{authenticator::Authenticator, message::Message};
 
-type Auth = dyn Authenticator + Send + Sync;
+type Auth = dyn Authenticator + Sync + Send;
 
-struct AppSyncMessageSender {
+pub struct AppSyncMessageSender {
 	uri: String,
 	auth: Arc<Auth>,
 	client: hyper::Client<hyper::client::connect::HttpConnector>,
@@ -21,19 +21,11 @@ impl AppSyncMessageSender {
 	}
 
 	fn message_to_body(message: Message) -> hyper::Body {
-		let Message {
-			sender,
-			channel,
-			contents,
-		} = message;
-		let event = json!({
-			"sender": sender,
-			"contents":  contents,
-		});
+		let event = serde_json::to_string(&message).unwrap();
 
 		let body_raw = json!({
-			"channel": channel,
-			"events": [event.to_string()],
+			"channel": message.channel,
+			"events": [event],
 		})
 		.to_string();
 

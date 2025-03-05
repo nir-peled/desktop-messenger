@@ -9,6 +9,9 @@ mod ui_connector;
 
 use std::sync::Arc;
 
+use authenticator::Authenticator;
+use message_receiver::appsync_message_receiver::AppSyncMessageReceiver;
+use message_sender::appsync_message_sender::AppSyncMessageSender;
 use settings::Settings;
 
 use crate::authenticator::appsync_api_authenticator::AppSyncAPIAuthenticator;
@@ -28,14 +31,24 @@ async fn main() {
 
 async fn run_client(settings: Settings) {
 	let auth = Arc::new(AppSyncAPIAuthenticator::new(
-		settings.APPSYNC_HTTP_DOMAIN,
-		settings.APPSYNC_API_KEY,
+		settings.APPSYNC_HTTP_DOMAIN.into_boxed_str(),
+		settings.APPSYNC_API_KEY.into_boxed_str(),
 	));
+
 	let mut messenger = Messenger::new(
 		Arc::clone(&auth),
-		DummyMessageReceiver::new(),
-		DummyMessageSender::new(),
+		// DummyMessageReceiver::new(),
+		// DummyMessageSender::new(),
+		AppSyncMessageReceiver::new(
+			Arc::clone(&auth) as Arc<dyn Authenticator + Send + Sync>,
+			settings.APPSYNC_WEBSOCKET_URL,
+		),
+		AppSyncMessageSender::new(
+			settings.APPSYNC_PUBLISH_URL,
+			Arc::clone(&auth) as Arc<dyn Authenticator + Send + Sync>,
+		),
 		SimplifiedUI::new(),
 	);
+
 	messenger.start().await;
 }
