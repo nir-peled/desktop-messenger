@@ -15,8 +15,6 @@ use message_sender::appsync_message_sender::AppSyncMessageSender;
 use settings::Settings;
 
 use crate::authenticator::appsync_api_authenticator::AppSyncAPIAuthenticator;
-use crate::message_receiver::dummy::DummyMessageReceiver;
-use crate::message_sender::dummy::DummyMessageSender;
 use crate::messenger::Messenger;
 use crate::ui_connector::simplified::SimplifiedUI;
 

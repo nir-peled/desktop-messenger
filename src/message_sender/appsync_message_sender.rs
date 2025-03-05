@@ -1,4 +1,4 @@
-use reqwest::{Client, RequestBuilder, Response};
+use reqwest::{Client, RequestBuilder};
 use serde_json::json;
 use std::sync::Arc;
 
