@@ -1,5 +1,6 @@
 use std::{
 	collections::HashMap,
+	str::FromStr,
 	sync::{Arc, Weak},
 };
 
@@ -11,7 +12,9 @@ use tokio::{net::TcpStream, sync::Mutex, task::JoinHandle};
 use tokio_tungstenite::{
 	connect_async_tls_with_config,
 	tungstenite::{
-		http::Request as WebSocketRequest, protocol::Message as WebSocketMessage, Utf8Bytes,
+		http::{Request as WebSocketRequest, Uri},
+		protocol::Message as WebSocketMessage,
+		Utf8Bytes,
 	},
 	MaybeTlsStream, WebSocketStream,
 };
@@ -43,7 +46,7 @@ pub struct AppSyncMessageReceiver {
 }
 
 impl AppSyncMessageReceiver {
-	pub fn new(authenticator: Arc<Auth>, uri: String) -> Self {
+	pub fn new(uri: String, authenticator: Arc<Auth>) -> Self {
 		Self { authenticator, uri }
 	}
 
@@ -62,9 +65,18 @@ impl MessageReceiver for AppSyncMessageReceiver {
 	) -> Result<OpenConnectionHolder, MessageReceiverError> {
 		let auth_header = self.auth_header();
 		let subprotocols = format!("aws-appsync-event-ws,{}", auth_header);
+		let uri = Uri::from_str(&self.uri).unwrap();
 
 		let request = WebSocketRequest::builder()
-			.uri(self.uri.clone())
+			.uri(&uri)
+			.header("Host", uri.host().unwrap())
+			.header("Connection", "Upgrade")
+			.header("Upgrade", "websocket")
+			.header("Sec-WebSocket-Version", "13")
+			.header(
+				"Sec-WebSocket-Key",
+				tokio_tungstenite::tungstenite::handshake::client::generate_key(),
+			)
 			.header("Sec-WebSocket-Protocol", subprotocols)
 			.body(())?;
 
@@ -94,7 +106,7 @@ impl AppSyncOpenConnection {
 		let websocket = Arc::clone(&result.lock().await.websocket);
 
 		result.lock().await.listener_handle = tokio::task::spawn(async move {
-			while let Some(received_message) = websocket.blocking_lock().next().await {
+			while let Some(received_message) = websocket.lock().await.next().await {
 				match received_message {
 					Ok(message_base) => {
 						if let WebSocketMessage::Text(message) = message_base {
@@ -110,7 +122,7 @@ impl AppSyncOpenConnection {
 			}
 		});
 
-		todo!()
+		result
 	}
 
 	async fn send_unsubscribe(websocket: &WebSocketHolder, channel_id: &str) {

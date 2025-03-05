@@ -40,8 +40,8 @@ async fn run_client(settings: Settings) {
 		// DummyMessageReceiver::new(),
 		// DummyMessageSender::new(),
 		AppSyncMessageReceiver::new(
-			Arc::clone(&auth) as Arc<dyn Authenticator + Send + Sync>,
 			settings.APPSYNC_WEBSOCKET_URL,
+			Arc::clone(&auth) as Arc<dyn Authenticator + Send + Sync>,
 		),
 		AppSyncMessageSender::new(
 			settings.APPSYNC_PUBLISH_URL,
