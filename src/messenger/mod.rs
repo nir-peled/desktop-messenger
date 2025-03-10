@@ -62,8 +62,8 @@ impl<
 	}
 
 	async fn handle_tasks(&mut self, connection: &OpenConnectionHolder) {
-		let mut task = self.task_queue.pop().await;
 		loop {
+			let task = self.task_queue.pop().await;
 			match task {
 				TaskData::SendMessage(message) => {
 					let res = self.message_sender.send_text_message(message).await;
@@ -80,8 +80,6 @@ impl<
 				}
 				TaskData::Exit => break,
 			};
-
-			task = self.task_queue.pop().await;
 		}
 	}
 }

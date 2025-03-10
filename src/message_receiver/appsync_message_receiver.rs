@@ -6,7 +6,7 @@ use std::{
 
 use async_trait::async_trait;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as base64_engine, Engine as _};
-use futures_util::{sink::SinkExt, StreamExt};
+use futures_util::{sink::SinkExt, stream::SplitSink, StreamExt};
 use serde_json::{json, Value};
 use tokio::{net::TcpStream, sync::Mutex, task::JoinHandle};
 use tokio_tungstenite::{
@@ -30,10 +30,10 @@ use super::{MessageReceiver, MessageReceiverError, OpenConnection, OpenConnectio
 
 type Auth = dyn Authenticator + Send + Sync;
 type WebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
-type WebSocketHolder = Arc<Mutex<WebSocket>>;
+type WebSocketHolder = Arc<Mutex<SplitSink<WebSocket, WebSocketMessage>>>;
 
 pub struct AppSyncOpenConnection {
-	websocket: WebSocketHolder,
+	websocket_send: WebSocketHolder,
 	authenticator: Arc<Auth>,
 	channels_ids: HashMap<Box<str>, Box<str>>,
 	task_queue: TaskQueue,
@@ -65,11 +65,14 @@ impl MessageReceiver for AppSyncMessageReceiver {
 	) -> Result<OpenConnectionHolder, MessageReceiverError> {
 		let auth_header = self.auth_header();
 		let subprotocols = format!("aws-appsync-event-ws,{}", auth_header);
-		let uri = Uri::from_str(&self.uri).unwrap();
+		let uri = Uri::from_str(&self.uri)?;
+		let host = uri.host().ok_or(MessageReceiverError::ConnectionError(
+			"URI missing host".to_owned(),
+		))?;
 
 		let request = WebSocketRequest::builder()
 			.uri(&uri)
-			.header("Host", uri.host().unwrap())
+			.header("Host", host)
 			.header("Connection", "Upgrade")
 			.header("Upgrade", "websocket")
 			.header("Sec-WebSocket-Version", "13")
@@ -95,18 +98,19 @@ impl AppSyncOpenConnection {
 		websocket: WebSocket,
 		authenticator: Arc<Auth>,
 	) -> OpenConnectionHolder {
+		let (send, mut receive) = websocket.split();
+
 		let result = Arc::new(Mutex::new(Self {
-			websocket: Arc::new(Mutex::new(websocket)),
+			websocket_send: Arc::new(Mutex::new(send)),
 			authenticator,
 			channels_ids: HashMap::new(),
 			task_queue,
 			listener_handle: tokio::task::spawn(async {}),
 		}));
 		let weak_copy = Arc::downgrade(&result);
-		let websocket = Arc::clone(&result.lock().await.websocket);
 
 		result.lock().await.listener_handle = tokio::task::spawn(async move {
-			while let Some(received_message) = websocket.lock().await.next().await {
+			while let Some(received_message) = receive.next().await {
 				match received_message {
 					Ok(message_base) => {
 						if let WebSocketMessage::Text(message) = message_base {
@@ -117,7 +121,7 @@ impl AppSyncOpenConnection {
 							}
 						}
 					}
-					Err(_e) => break,
+					Err(_) => break,
 				}
 			}
 		});
@@ -140,6 +144,7 @@ impl AppSyncOpenConnection {
 		let message_value: Value = serde_json::from_str(message_raw.as_str()).ok()?;
 		let message_obj = message_value.as_object()?;
 
+		// ignore any non-data messages for the meanwhile
 		if message_obj.get("type")? != "data" {
 			return Some(());
 		}
@@ -164,12 +169,14 @@ impl AppSyncOpenConnection {
 impl Drop for AppSyncOpenConnection {
 	fn drop(&mut self) {
 		let ids: Vec<Box<str>> = self.channels_ids.values().map(|id| id.clone()).collect();
-		let websocket = Arc::clone(&self.websocket);
+		let websocket = Arc::clone(&self.websocket_send);
 
 		tokio::task::spawn(async move {
 			for id in ids {
 				Self::send_unsubscribe(&websocket, &id).await;
 			}
+
+			let _ = websocket.lock().await.close().await;
 		});
 	}
 }
@@ -194,7 +201,7 @@ impl OpenConnection for AppSyncOpenConnection {
 		.to_string();
 		let message = WebSocketMessage::text(message_raw);
 
-		let result = self.websocket.lock().await.send(message).await;
+		let result = self.websocket_send.lock().await.send(message).await;
 		if let Err(e) = result {
 			panic!("Error sending subscribe messsage: {}", e);
 		}
@@ -207,7 +214,7 @@ impl OpenConnection for AppSyncOpenConnection {
 		match channel_id {
 			None => (),
 			Some(channel_id) => {
-				Self::send_unsubscribe(&self.websocket, channel_id).await;
+				Self::send_unsubscribe(&self.websocket_send, channel_id).await;
 				self.channels_ids.remove(channel);
 			}
 		}
@@ -232,6 +239,12 @@ impl From<tokio_tungstenite::tungstenite::http::Error> for MessageReceiverError 
 
 impl From<tokio_tungstenite::tungstenite::Error> for MessageReceiverError {
 	fn from(error: tokio_tungstenite::tungstenite::Error) -> Self {
+		Self::ConnectionError(error.to_string())
+	}
+}
+
+impl From<tokio_tungstenite::tungstenite::http::uri::InvalidUri> for MessageReceiverError {
+	fn from(error: tokio_tungstenite::tungstenite::http::uri::InvalidUri) -> Self {
 		Self::ConnectionError(error.to_string())
 	}
 }
