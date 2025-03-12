@@ -7,8 +7,11 @@ pub struct AppSyncAPIAuthenticator {
 }
 
 impl AppSyncAPIAuthenticator {
-	pub fn new(hostname: Box<str>, api_key: Box<str>) -> Self {
-		Self { hostname, api_key }
+	pub fn new(hostname: &Box<str>, api_key: &Box<str>) -> Self {
+		Self {
+			hostname: hostname.clone(),
+			api_key: api_key.clone(),
+		}
 	}
 }
 

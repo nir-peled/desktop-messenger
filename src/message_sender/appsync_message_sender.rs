@@ -10,15 +10,19 @@ use crate::{authenticator::Authenticator, message::Message};
 type Auth = dyn Authenticator + Sync + Send;
 
 pub struct AppSyncMessageSender {
-	uri: String,
+	uri: Box<str>,
 	auth: Arc<Auth>,
 	client: Client,
 }
 
 impl AppSyncMessageSender {
-	pub fn new(uri: String, auth: Arc<Auth>) -> Self {
+	pub fn new(uri: &Box<str>, auth: Arc<Auth>) -> Self {
 		let client = Client::new();
-		Self { uri, auth, client }
+		Self {
+			uri: uri.clone(),
+			auth,
+			client,
+		}
 	}
 
 	fn message_to_body(message: Message) -> serde_json::Value {
@@ -35,7 +39,7 @@ impl AppSyncMessageSender {
 
 		let mut request_builder = self
 			.client
-			.post(&self.uri)
+			.post(self.uri.as_ref())
 			.header("content_type", "application/json");
 
 		for (key, value) in self.auth.publish_auth_headers() {

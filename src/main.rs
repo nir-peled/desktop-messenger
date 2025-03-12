@@ -29,8 +29,8 @@ async fn main() {
 
 async fn run_client(settings: Settings) {
 	let auth = Arc::new(AppSyncAPIAuthenticator::new(
-		settings.APPSYNC_HTTP_DOMAIN.into_boxed_str(),
-		settings.APPSYNC_API_KEY.into_boxed_str(),
+		&settings.APPSYNC_HTTP_DOMAIN,
+		&settings.APPSYNC_API_KEY,
 	));
 
 	let mut messenger = Messenger::new(
@@ -38,11 +38,11 @@ async fn run_client(settings: Settings) {
 		// DummyMessageReceiver::new(),
 		// DummyMessageSender::new(),
 		AppSyncMessageReceiver::new(
-			settings.APPSYNC_WEBSOCKET_URL,
+			&settings.APPSYNC_WEBSOCKET_URL,
 			Arc::clone(&auth) as Arc<dyn Authenticator + Send + Sync>,
 		),
 		AppSyncMessageSender::new(
-			settings.APPSYNC_PUBLISH_URL,
+			&settings.APPSYNC_PUBLISH_URL,
 			Arc::clone(&auth) as Arc<dyn Authenticator + Send + Sync>,
 		),
 		SimplifiedUI::new(),

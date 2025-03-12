@@ -42,12 +42,15 @@ pub struct AppSyncOpenConnection {
 
 pub struct AppSyncMessageReceiver {
 	authenticator: Arc<Auth>,
-	uri: String,
+	uri: Box<str>,
 }
 
 impl AppSyncMessageReceiver {
-	pub fn new(uri: String, authenticator: Arc<Auth>) -> Self {
-		Self { authenticator, uri }
+	pub fn new(uri: &Box<str>, authenticator: Arc<Auth>) -> Self {
+		Self {
+			authenticator,
+			uri: uri.clone(),
+		}
 	}
 
 	fn auth_header(&self) -> Box<str> {

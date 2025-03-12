@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 /*
  * Settings is meant to represent program-wide settings read at runtime from
  * an env-like file, into any types (or, at least, those convertible from string),
@@ -10,12 +11,31 @@ use std::io::{self, BufRead};
 use std::path::Path;
 
 #[derive(Debug)]
+pub struct ConstStr(Box<str>);
+
+#[derive(Debug)]
 pub enum SettingsReadError {
 	MissingField(String),
 	DuplicateField(String),
 	UnknownField(String),
 	BadFile(String),
 	BadFormatting(String),
+}
+
+impl std::str::FromStr for ConstStr {
+	type Err = Infallible;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(ConstStr(s.to_owned().into_boxed_str()))
+	}
+}
+
+impl std::ops::Deref for ConstStr {
+	type Target = Box<str>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
 }
 
 impl std::error::Error for SettingsReadError {}
@@ -138,8 +158,8 @@ macro_rules! Settings {
 }
 
 Settings! {
-	APPSYNC_HTTP_DOMAIN: String,
-	APPSYNC_PUBLISH_URL: String,
-	APPSYNC_API_KEY: String,
-	APPSYNC_WEBSOCKET_URL: String,
+	APPSYNC_HTTP_DOMAIN: ConstStr,
+	APPSYNC_PUBLISH_URL: ConstStr,
+	APPSYNC_API_KEY: ConstStr,
+	APPSYNC_WEBSOCKET_URL: ConstStr,
 }
