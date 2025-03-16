@@ -105,10 +105,10 @@ macro_rules! Settings {
 				for line in lines {
 					let line_value = line?;
 					let (field_name, field_value) = Self::line_parts(&line_value)?;
-					Settings::try_fill_field(&mut read_values, field_name, field_value)?;
+					Self::try_fill_field(&mut read_values, field_name, field_value)?;
 				}
 
-				Settings::try_fill_settings(read_values)
+				Self::try_fill_settings(read_values)
 			}
 
 			fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
