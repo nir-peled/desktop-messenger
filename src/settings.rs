@@ -90,23 +90,16 @@ macro_rules! Settings {
 			$(pub $field: $t),*
 		}
 
+		#[derive(Default)]
 		#[allow(non_snake_case)]
 		struct SettingsReadValues {
 			$(pub $field: Option<$t>),*
 		}
 
-		impl SettingsReadValues {
-			pub fn empty() -> Self {
-				Self {
-					$($field: None,)*
-				}
-			}
-		}
-
 		impl Settings {
 			pub fn from_env_file<P>(filename: P) -> Result<Self, SettingsReadError>
 			where P: AsRef<Path>, {
-				let mut read_value = SettingsReadValues::empty();
+				let mut read_value = SettingsReadValues::default();
 				let lines = Self::read_lines(filename)?;
 
 				for line in lines {
