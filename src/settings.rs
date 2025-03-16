@@ -99,36 +99,16 @@ macro_rules! Settings {
 		impl Settings {
 			pub fn from_env_file<P>(filename: P) -> Result<Self, SettingsReadError>
 			where P: AsRef<Path>, {
-				let mut read_value = SettingsReadValues::default();
+				let mut read_values = SettingsReadValues::default();
 				let lines = Self::read_lines(filename)?;
 
 				for line in lines {
 					let line_value = line?;
 					let (field_name, field_value) = Self::line_parts(&line_value)?;
-					let mut found = false;
-					$(
-						if !found && stringify!($field) == field_name {
-							found = true;
-							match read_value.$field {
-								None => read_value.$field = Some(field_value.parse()?),
-								Some(_) => return Err(SettingsReadError::DuplicateField(stringify!($field).to_string()))
-							}
-						}
-					)*
-					if !found {
-						return Err(SettingsReadError::UnknownField(field_name.to_string()));
-					}
+					Settings::try_fill_field(&mut read_values, field_name, field_value)?;
 				}
 
-				Ok(
-					Self {
-						$(
-							$field: read_value.$field.ok_or(
-								SettingsReadError::MissingField(stringify!($field).to_string())
-							)?,
-						)*
-					}
-				)
+				Settings::try_fill_settings(read_values)
 			}
 
 			fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
@@ -145,6 +125,32 @@ macro_rules! Settings {
 				let field_value = splitter.next().ok_or_else(error_maker)?;
 
 				Ok((field_name, field_value))
+			}
+
+			fn try_fill_field(read_values: &mut SettingsReadValues, field_name: &str, field_value: &str) -> Result<(), SettingsReadError> {
+				$(
+					if stringify!($field) == field_name {
+						match read_values.$field {
+							None => read_values.$field = Some(field_value.parse()?),
+							Some(_) => return Err(SettingsReadError::DuplicateField(stringify!($field).to_string()))
+						}
+						return Ok(());
+					}
+				)*
+
+				Err(SettingsReadError::UnknownField(field_name.to_string()))
+			}
+
+			fn try_fill_settings(read_values: SettingsReadValues) -> Result<Self, SettingsReadError> {
+				Ok(
+					Self {
+						$(
+							$field: read_values.$field.ok_or(
+								SettingsReadError::MissingField(stringify!($field).to_string())
+							)?,
+						)*
+					}
+				)
 			}
 		}
 	};
